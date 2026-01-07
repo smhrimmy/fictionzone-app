@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { Story, Chapter, Review, StoryFilter, PaginatedResult } from '../types';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 
 export const NovelService = {
   getAllStories: async (filter: StoryFilter = {}): Promise<PaginatedResult<Story>> => {
