@@ -43,9 +43,11 @@ export const NovelService = {
      return undefined;
   },
 
-  getChapters: async (storyId: string): Promise<Chapter[]> => {
+  getChapters: async (storyId: string, title?: string): Promise<Chapter[]> => {
     try {
-        const response = await axios.get(`${API_URL}/content/chapters/${storyId}`);
+        const response = await axios.get(`${API_URL}/content/chapters/${storyId}`, {
+            params: { title }
+        });
         return response.data.map((ch: any) => ({
             id: ch.id,
             story_id: storyId,

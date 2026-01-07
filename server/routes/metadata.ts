@@ -24,15 +24,32 @@ router.get('/trending', async (req, res) => {
        }));
        res.json(results);
     } else {
-       // Fetch trending novels from FanMTL
-       let results = [];
+       // Fetch trending novels using AniList (Fast & Reliable Metadata)
+       // We'll use the 'NOVEL' format filter in AniList
        try {
-           results = await FanMTLService.search('system', 1);
+           const data = await AniListService.search({
+               query: undefined, // Trending/Popular usually implies no query
+               type: 'MANGA',
+               format: 'NOVEL',
+               page: 1,
+               perPage: 10
+           });
+           
+           const results = data.media.map((item: any) => ({
+             id: item.id.toString(), // Use AniList ID for display
+             title: item.title.english || item.title.romaji || item.title.native,
+             cover_image: item.coverImage.large,
+             description: item.description,
+             rating: item.averageScore ? item.averageScore / 10 : 0,
+             type: 'novel',
+             source: 'anilist' // Frontend will know to "search" this title on FanMTL when reading
+           }));
+           
+           res.json(results);
        } catch (e) {
-           console.warn('FanMTL Trending Failed, falling back to AO3', e);
-           results = await AO3Service.search('system', 1);
+           console.error('AniList Trending Failed', e);
+           res.json([]); // Return empty instead of 500
        }
-       res.json(results);
     }
   } catch (error) {
     console.error(error);

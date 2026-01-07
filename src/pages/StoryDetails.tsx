@@ -18,12 +18,18 @@ export default function StoryDetails() {
     const loadData = async () => {
       if (storyId) {
         setLoading(true);
-        const [storyData, chaptersData] = await Promise.all([
-          NovelService.getStoryById(storyId),
-          NovelService.getChapters(storyId)
-        ]);
-        setStory(storyData || null);
-        setChapters(chaptersData);
+        try {
+            // Fetch story details first to get the title for chapter lookup
+            const storyData = await NovelService.getStoryById(storyId);
+            setStory(storyData || null);
+
+            if (storyData) {
+                const chaptersData = await NovelService.getChapters(storyId, storyData.title);
+                setChapters(chaptersData);
+            }
+        } catch (error) {
+            console.error(error);
+        }
         setLoading(false);
       }
     };

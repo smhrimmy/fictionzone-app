@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { MangaDexService } from '../services/mangadex';
 import { AO3Service } from '../services/ao3';
 import { FanMTLService } from '../services/fanmtl';
+import { AniListService } from '../services/anilist';
 
 const router = Router();
 
@@ -17,6 +18,28 @@ router.get('/chapters/:storyId', async (req, res) => {
        // FanMTL handling
        const details = await FanMTLService.getNovelDetails(storyId);
        res.json(details.chapters || []);
+    } else if (!isNaN(Number(storyId)) && !storyId.includes('-')) {
+       // Numeric ID = AniList (likely)
+       // 1. Get Title from AniList
+       // Note: We don't have a direct getById in AniListService yet, usually we search.
+       // Let's implement a quick fetch or assume we search by ID if needed, but search usually works.
+       // For now, let's try to search FanMTL using the ID? No.
+       // We need to resolve AniList ID to FanMTL.
+       
+       // Fallback: If we can't easily resolve, return empty or try to search if title was passed (not possible in GET param easily without query)
+       // Ideally frontend passes title in query param?
+       const { title } = req.query;
+       
+       if (title) {
+           const results = await FanMTLService.search(title as string, 1);
+           if (results.length > 0) {
+               const fanmtlId = results[0].id;
+               const details = await FanMTLService.getNovelDetails(fanmtlId);
+               res.json(details.chapters || []);
+               return;
+           }
+       }
+       res.json([]);
     } else {
        // MangaDex
        const data = await MangaDexService.getChapters(storyId);
