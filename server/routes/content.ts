@@ -84,42 +84,63 @@ router.get('/chapter/:storyId/:chapterId', async (req, res) => {
         // AniList ID - Resolve to FanMTL
         const aniListMedia = await AniListService.getById(parseInt(storyId));
         if (aniListMedia) {
-              const title = aniListMedia.title.english || aniListMedia.title.romaji || aniListMedia.title.native;
-              
-              // Try FanMTL first
-              let results = await FanMTLService.search(title, 1);
-              if (results.length > 0) {
-                  const fanmtlId = results[0].id;
-                  const data = await FanMTLService.getChapterContent(fanmtlId, chapterId);
-                  res.json({
-                     id: chapterId,
-                     title: data.title,
-                     chapter_number: 0,
-                     content: data.content,
-                     published_at: new Date().toISOString()
-                  });
-                  return;
-              }
-              
-              // Fallback to AO3
-              // Note: chapterId from frontend is likely "1" or "chapter-1". AO3 expects index "1".
-              const chapNum = parseInt(chapterId.match(/\d+/)?.[0] || '1');
-              
-              results = await AO3Service.search(title, 1);
-              if (results.length > 0) {
-                  const ao3Id = results[0].id; // "ao3_12345"
-                  const data = await AO3Service.getChapter(ao3Id, chapNum);
-                  res.json({
+               // Strategy: Try English title, then Romaji title to find the novel on FanMTL
+               let results = [];
+               
+               // 1. Try English Title
+               if (aniListMedia.title.english) {
+                   // Remove " (Novel)" or similar suffixes that might confuse search
+                   const cleanTitle = aniListMedia.title.english.replace(/\(Novel\)/i, '').trim();
+                   results = await FanMTLService.search(cleanTitle, 1);
+               }
+
+               // 2. Try Romaji Title if English failed
+               if (results.length === 0 && aniListMedia.title.romaji) {
+                   const cleanTitle = aniListMedia.title.romaji.replace(/\(Novel\)/i, '').trim();
+                   results = await FanMTLService.search(cleanTitle, 1);
+               }
+               
+               // 3. Try Native Title (rarely works but worth a shot for raw scrapers)
+               if (results.length === 0 && aniListMedia.title.native) {
+                   results = await FanMTLService.search(aniListMedia.title.native, 1);
+               }
+               
+               if (results.length > 0) {
+                   const fanmtlId = results[0].id;
+                   const data = await FanMTLService.getChapterContent(fanmtlId, chapterId);
+                   res.json({
                       id: chapterId,
                       title: data.title,
-                      chapter_number: chapNum,
+                      chapter_number: 0,
                       content: data.content,
                       published_at: new Date().toISOString()
-                  });
-                  return;
-              }
-         }
-         res.status(404).json({ error: 'Content not found via resolution' });
+                   });
+                   return;
+               }
+               
+               // Fallback to AO3
+               // Note: chapterId from frontend is likely "1" or "chapter-1". AO3 expects index "1".
+               const chapNum = parseInt(chapterId.match(/\d+/)?.[0] || '1');
+               
+               // Same search strategy for AO3
+               let ao3Results = [];
+               if (aniListMedia.title.english) ao3Results = await AO3Service.search(aniListMedia.title.english, 1);
+               if (ao3Results.length === 0 && aniListMedia.title.romaji) ao3Results = await AO3Service.search(aniListMedia.title.romaji, 1);
+
+               if (ao3Results.length > 0) {
+                   const ao3Id = ao3Results[0].id; // "ao3_12345"
+                   const data = await AO3Service.getChapter(ao3Id, chapNum);
+                   res.json({
+                       id: chapterId,
+                       title: data.title,
+                       chapter_number: chapNum,
+                       content: data.content,
+                       published_at: new Date().toISOString()
+                   });
+                   return;
+               }
+          }
+          res.status(404).json({ error: 'Content not found via resolution' });
     } else {
         // MangaDex - Fetch Pages
         const pages = await MangaDexService.getChapterPages(chapterId);
