@@ -53,7 +53,8 @@ export default function Reader() {
         if (!currentChapter && chapterId) {
              currentChapter = chaptersData.find(c => c.chapter_number.toString() === chapterId) ||
                               chaptersData.find(c => c.id.endsWith(`-${chapterId}`)) ||
-                              chaptersData.find(c => c.id.endsWith(`_${chapterId}`));
+                              chaptersData.find(c => c.id.endsWith(`_${chapterId}`)) ||
+                              chaptersData.find(c => parseInt(c.id.match(/\d+$/)?.[0] || '-1') === parseInt(chapterId));
         }
 
         if (currentChapter) {
@@ -142,16 +143,20 @@ export default function Reader() {
   }
 
   if (loadedChapters.length === 0 || !story) {
-      return (
-          <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center text-white space-y-4">
-              <h1 className="text-2xl font-bold">Chapter Not Found</h1>
-              <p className="text-gray-400">Could not load chapter {chapterId}</p>
-              <Link to={`/story/${storyId}`} className="px-4 py-2 bg-primary text-black rounded-full font-bold hover:bg-primary/90">
-                  Return to Story
-              </Link>
-          </div>
-      );
-  }
+       return (
+           <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center text-white space-y-4">
+               <h1 className="text-2xl font-bold">Chapter Not Found</h1>
+               <p className="text-gray-400">
+                   {allChapters.length === 0 
+                       ? "No chapters found for this story." 
+                       : `Could not load chapter ${chapterId} (Available: ${allChapters.length})`}
+               </p>
+               <Link to={`/story/${storyId}`} className="px-4 py-2 bg-primary text-black rounded-full font-bold hover:bg-primary/90">
+                   Return to Story
+               </Link>
+           </div>
+       );
+   }
 
   const currentChapter = loadedChapters[0];
   
