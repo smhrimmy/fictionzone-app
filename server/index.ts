@@ -18,9 +18,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'FictionZone API is running' });
 });
 
-import metadataRoutes from './routes/metadata';
-import translationRoutes from './routes/translation';
-import contentRoutes from './routes/content';
+import metadataRoutes from './routes/metadata.js';
+import translationRoutes from './routes/translation.js';
+import contentRoutes from './routes/content.js';
 
 app.use('/api/metadata', metadataRoutes);
 app.use('/api/translate', translationRoutes);

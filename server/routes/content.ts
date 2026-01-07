@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { MangaDexService } from '../services/mangadex';
-import { AO3Service } from '../services/ao3';
-import { FanMTLService } from '../services/fanmtl';
-import { AniListService } from '../services/anilist';
+import { MangaDexService } from '../services/mangadex.js';
+import { AO3Service } from '../services/ao3.js';
+import { FanMTLService } from '../services/fanmtl.js';
+import { AniListService } from '../services/anilist.js';
 
 const router = Router();
 

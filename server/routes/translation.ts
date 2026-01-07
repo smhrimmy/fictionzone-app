@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { TranslationService } from '../services/translationService';
+import { TranslationService } from '../services/translationService.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
