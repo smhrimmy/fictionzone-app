@@ -148,10 +148,27 @@ router.get('/:type/:id', async (req, res) => {
   try {
     if (type === 'manga') {
         // MangaDex
-        // TODO: Implement getMangaById in MangaDexService if needed, or rely on search
-        // For now, let's assume we can fetch by ID or return a placeholder if we have data on frontend
-        // But frontend calls this.
-        res.status(501).json({ error: 'Not implemented' });
+        try {
+            const data = await MangaDexService.getMangaById(id);
+            const m = data.data;
+            
+            res.json({
+                 id: m.id,
+                 title: m.attributes.title.en || Object.values(m.attributes.title)[0],
+                 author: { username: m.relationships.find((r: any) => r.type === 'author')?.attributes?.name || 'Unknown' },
+                 description: m.attributes.description.en || 'No description',
+                 cover_image: MangaDexService.getCoverUrl(m) || '',
+                 status: m.attributes.status,
+                 type: 'manga',
+                 source: 'mangadex',
+                 genres: m.attributes.tags.map((t: any) => t.attributes.name.en),
+                 rating: 0, // MangaDex doesn't give rating in simple call usually
+                 views: 0
+            });
+        } catch (e) {
+            console.error(e);
+            res.status(404).json({ error: 'Manga not found' });
+        }
     } else {
         // Novel
         if (!isNaN(Number(id))) {

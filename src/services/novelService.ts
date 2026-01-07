@@ -40,11 +40,14 @@ export const NovelService = {
 
   getStoryById: async (id: string): Promise<Story | undefined> => {
     try {
-        const response = await axios.get(`${API_URL}/metadata/novel/${id}`);
+        const isManga = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const type = isManga ? 'manga' : 'novel';
+
+        const response = await axios.get(`${API_URL}/metadata/${type}/${id}`);
         const item = response.data;
         return {
             ...item,
-            content_type: 'novel',
+            content_type: type,
             type: 'Translated',
             author: { id: 'unknown', username: item.author?.username || 'Unknown' },
             is_completed: item.status === 'Completed' || item.status === 'FINISHED',
