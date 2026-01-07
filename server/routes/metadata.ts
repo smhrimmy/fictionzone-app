@@ -24,8 +24,14 @@ router.get('/trending', async (req, res) => {
        }));
        res.json(results);
     } else {
-       // Fetch trending novels from FanMTL (Search empty query or scrape home)
-       const results = await FanMTLService.search('system', 1); // "system" is a popular keyword to get trending-like results
+       // Fetch trending novels from FanMTL
+       let results = [];
+       try {
+           results = await FanMTLService.search('system', 1);
+       } catch (e) {
+           console.warn('FanMTL Trending Failed, falling back to AO3', e);
+           results = await AO3Service.search('system', 1);
+       }
        res.json(results);
     }
   } catch (error) {
@@ -66,11 +72,20 @@ router.get('/search', async (req, res) => {
 
     } else if (type === 'novel' || type === 'fanfiction') {
        // Try FanMTL first
-       let results = await FanMTLService.search(searchQuery, pageNum);
+       let results = [];
+       try {
+           results = await FanMTLService.search(searchQuery, pageNum);
+       } catch (e) {
+           console.warn('FanMTL Search Failed', e);
+       }
        
        if (results.length === 0) {
            // Fallback to AO3
-           results = await AO3Service.search(searchQuery, pageNum);
+           try {
+               results = await AO3Service.search(searchQuery, pageNum);
+           } catch (e) {
+               console.warn('AO3 Search Failed', e);
+           }
        }
 
        res.json({ results, pageInfo: { hasNextPage: true } });

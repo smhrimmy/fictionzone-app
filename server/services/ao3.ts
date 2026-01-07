@@ -3,6 +3,10 @@ import * as cheerio from 'cheerio';
 
 const BASE_URL = 'https://archiveofourown.org';
 
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; FictionZone/1.0; +https://fictionzone.vercel.app)'
+};
+
 export class AO3Service {
   
   static async search(query: string, page: number = 1) {
@@ -11,7 +15,8 @@ export class AO3Service {
         params: {
           'work_search[query]': query,
           'page': page
-        }
+        },
+        headers: HEADERS
       });
       
       const $ = cheerio.load(response.data);
@@ -67,7 +72,7 @@ export class AO3Service {
       
       const response = await axios.get(`${BASE_URL}/works/${realId}`, {
         params: { view_full_work: 'true', view_adult: 'true' },
-         headers: { 'Cookie': 'view_adult=true' } // Bypass adult warning
+         headers: { ...HEADERS, 'Cookie': 'view_adult=true' } // Bypass adult warning
       });
 
       const $ = cheerio.load(response.data);

@@ -3,6 +3,13 @@ import * as cheerio from 'cheerio';
 
 const BASE_URL = 'https://fanmtl.com';
 
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+  'Referer': BASE_URL
+};
+
 export class FanMTLService {
   
   static async search(query: string, page: number = 1) {
@@ -11,7 +18,8 @@ export class FanMTLService {
         params: {
           s: query,
           post_type: 'wp-manga'
-        }
+        },
+        headers: HEADERS
       });
       
       const $ = cheerio.load(response.data);
@@ -52,7 +60,7 @@ export class FanMTLService {
   static async getNovelDetails(id: string) {
     const realId = id.replace('fanmtl_', '');
     try {
-        const response = await axios.get(`${BASE_URL}/novel/${realId}`);
+        const response = await axios.get(`${BASE_URL}/novel/${realId}`, { headers: HEADERS });
         const $ = cheerio.load(response.data);
         
         const title = $('.post-title h1').text().trim();
@@ -110,7 +118,7 @@ export class FanMTLService {
 
       try {
           const url = `${BASE_URL}/novel/${realNovelId}/${realChapterId}`;
-          const response = await axios.get(url);
+          const response = await axios.get(url, { headers: HEADERS });
           const $ = cheerio.load(response.data);
 
           const title = $('#chapter-heading').text().trim();
