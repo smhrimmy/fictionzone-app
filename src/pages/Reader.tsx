@@ -48,7 +48,14 @@ export default function Reader() {
         setStory(storyData || null);
         setAllChapters(chaptersData);
         
-        const currentChapter = chaptersData.find(c => c.id === chapterId);
+        let currentChapter = chaptersData.find(c => c.id === chapterId);
+        // Fuzzy match if direct match fails
+        if (!currentChapter && chapterId) {
+             currentChapter = chaptersData.find(c => c.chapter_number.toString() === chapterId) ||
+                              chaptersData.find(c => c.id.endsWith(`-${chapterId}`)) ||
+                              chaptersData.find(c => c.id.endsWith(`_${chapterId}`));
+        }
+
         if (currentChapter) {
           setLoadedChapters([currentChapter]);
         }
@@ -64,7 +71,13 @@ export default function Reader() {
          // Check if the requested chapter is already loaded (e.g. via scroll)
          // If not, or if it's a jump, we might want to reset loadedChapters
          // For simple behavior: if the user clicks a specific chapter in the menu, we reset the view to that chapter.
-         const targetChapter = allChapters.find(c => c.id === chapterId);
+         let targetChapter = allChapters.find(c => c.id === chapterId);
+         if (!targetChapter && chapterId) {
+             targetChapter = allChapters.find(c => c.chapter_number.toString() === chapterId) ||
+                             allChapters.find(c => c.id.endsWith(`-${chapterId}`)) ||
+                             allChapters.find(c => c.id.endsWith(`_${chapterId}`));
+         }
+
          if (targetChapter && loadedChapters[0]?.id !== targetChapter.id) {
              setLoadedChapters([targetChapter]);
              window.scrollTo(0, 0);
@@ -128,7 +141,17 @@ export default function Reader() {
     );
   }
 
-  if (loadedChapters.length === 0 || !story) return null;
+  if (loadedChapters.length === 0 || !story) {
+      return (
+          <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center text-white space-y-4">
+              <h1 className="text-2xl font-bold">Chapter Not Found</h1>
+              <p className="text-gray-400">Could not load chapter {chapterId}</p>
+              <Link to={`/story/${storyId}`} className="px-4 py-2 bg-primary text-black rounded-full font-bold hover:bg-primary/90">
+                  Return to Story
+              </Link>
+          </div>
+      );
+  }
 
   const currentChapter = loadedChapters[0];
   
