@@ -253,7 +253,15 @@ export default function Reader() {
                         lineHeight: readerSettings.lineHeight
                     }}
                 >
-                    <div dangerouslySetInnerHTML={{ __html: chapter.content }} />
+                    <div className="flex flex-col gap-0 items-center">
+                        {chapter.images && chapter.images.length > 0 ? (
+                            chapter.images.map((img, idx) => (
+                                <img key={idx} src={img} alt={`Page ${idx + 1}`} className="w-full max-w-3xl h-auto" loading="lazy" />
+                            ))
+                        ) : (
+                            <div dangerouslySetInnerHTML={{ __html: chapter.content }} />
+                        )}
+                    </div>
                 </div>
 
                 {/* Bottom Interaction Area - Only for the last loaded chapter if it's the absolute last one, or just generic footer */}

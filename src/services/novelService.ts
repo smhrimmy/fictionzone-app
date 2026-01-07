@@ -91,7 +91,8 @@ export const NovelService = {
             title: response.data.title,
             chapter_number: response.data.chapter_number,
             content: response.data.content,
-            word_count: response.data.content.length / 5,
+            images: response.data.images,
+            word_count: response.data.content?.length / 5 || 0,
             published_at: new Date().toISOString()
         };
     } catch (error) {

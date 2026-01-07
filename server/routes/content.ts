@@ -76,10 +76,30 @@ router.get('/chapter/:storyId/:chapterId', async (req, res) => {
         res.json({
             id: chapterId,
             title: data.title,
-            chapter_number: 0, // Need to parse from title if possible
+            chapter_number: 0,
             content: data.content,
             published_at: new Date().toISOString()
         });
+    } else if (!isNaN(Number(storyId)) && !storyId.includes('-')) {
+        // AniList ID - Resolve to FanMTL
+        const aniListMedia = await AniListService.getById(parseInt(storyId));
+        if (aniListMedia) {
+             const title = aniListMedia.title.english || aniListMedia.title.romaji || aniListMedia.title.native;
+             const results = await FanMTLService.search(title, 1);
+             if (results.length > 0) {
+                 const fanmtlId = results[0].id;
+                 const data = await FanMTLService.getChapterContent(fanmtlId, chapterId);
+                 res.json({
+                    id: chapterId,
+                    title: data.title,
+                    chapter_number: 0,
+                    content: data.content,
+                    published_at: new Date().toISOString()
+                 });
+                 return;
+             }
+        }
+        res.status(404).json({ error: 'Content not found via resolution' });
     } else {
         // MangaDex - Fetch Pages
         const pages = await MangaDexService.getChapterPages(chapterId);
