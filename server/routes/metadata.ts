@@ -41,9 +41,18 @@ router.get('/trending', async (req, res) => {
              cover_image: item.coverImage.large,
              description: item.description,
              rating: item.averageScore ? item.averageScore / 10 : 0,
+             views: item.popularity || 0, // Fix NaN issue
+             chapters: item.chapters || 0,
              type: 'novel',
-             source: 'anilist' // Frontend will know to "search" this title on FanMTL when reading
+             source: 'anilist'
            }));
+           
+           // Sort: Items with chapters first (if available), then by popularity
+           results.sort((a: any, b: any) => {
+               if (a.chapters > 0 && b.chapters === 0) return -1;
+               if (a.chapters === 0 && b.chapters > 0) return 1;
+               return b.views - a.views;
+           });
            
            res.json(results);
        } catch (e) {
@@ -129,6 +138,57 @@ router.get('/search', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch metadata' });
+  }
+});
+
+// GET /api/metadata/:type/:id
+router.get('/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+
+  try {
+    if (type === 'manga') {
+        // MangaDex
+        // TODO: Implement getMangaById in MangaDexService if needed, or rely on search
+        // For now, let's assume we can fetch by ID or return a placeholder if we have data on frontend
+        // But frontend calls this.
+        res.status(501).json({ error: 'Not implemented' });
+    } else {
+        // Novel
+        if (!isNaN(Number(id))) {
+             // AniList ID
+             const item = await AniListService.getById(parseInt(id));
+             
+             if (item) {
+                 res.json({
+                     id: item.id.toString(),
+                     title: item.title.english || item.title.romaji || item.title.native,
+                     cover_image: item.coverImage.extraLarge || item.coverImage.large,
+                     description: item.description,
+                     status: item.status,
+                     rating: item.averageScore ? item.averageScore / 10 : 0,
+                     views: item.popularity || 0,
+                     chapters_count: item.chapters || 0,
+                     genres: item.genres || [],
+                     author: { username: 'Unknown' }, // AniList requires separate query for staff usually
+                     type: 'novel',
+                     source: 'anilist'
+                 });
+             } else {
+                 res.status(404).json({ error: 'Novel not found' });
+             }
+         } else {
+            // FanMTL ID
+            const details = await FanMTLService.getNovelDetails(id);
+            res.json({
+                ...details,
+                type: 'novel',
+                source: 'fanmtl'
+            });
+        }
+    }
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to fetch details' });
   }
 });
 

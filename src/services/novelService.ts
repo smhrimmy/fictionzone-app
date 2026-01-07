@@ -38,9 +38,25 @@ export const NovelService = {
     }
   },
 
-  getStoryById: async (_id: string): Promise<Story | undefined> => {
-     // TODO: Implement getById endpoint in backend for details
-     return undefined;
+  getStoryById: async (id: string): Promise<Story | undefined> => {
+    try {
+        const response = await axios.get(`${API_URL}/metadata/novel/${id}`);
+        const item = response.data;
+        return {
+            ...item,
+            content_type: 'novel',
+            type: 'Translated',
+            author: { id: 'unknown', username: item.author?.username || 'Unknown' },
+            is_completed: item.status === 'Completed' || item.status === 'FINISHED',
+            rating: item.rating || 0,
+            total_reads: item.views || 0,
+            chapters_count: item.chapters_count || 0,
+            genres: item.genres || []
+        };
+    } catch (error) {
+        console.error("Failed to fetch story details", error);
+        return undefined;
+    }
   },
 
   getChapters: async (storyId: string, title?: string): Promise<Chapter[]> => {
