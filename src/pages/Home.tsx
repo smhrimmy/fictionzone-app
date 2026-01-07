@@ -99,13 +99,13 @@ export default function Home() {
         <section className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <h2 className="text-2xl font-bold text-white">Most Read Novels</h2>
-                <div className="flex gap-2 bg-[#1a1a1a] p-1 rounded-full border border-white/5">
+                <div className="flex gap-2 bg-[#1a1a1a] p-1 rounded-full border border-white/5 overflow-x-auto scrollbar-hide max-w-full">
                     {(['Daily', 'Weekly', 'Monthly', 'All Time'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setMostReadTab(tab as any)}
                             className={cn(
-                                "px-4 py-1.5 rounded-full text-xs font-medium transition-all",
+                                "px-4 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
                                 mostReadTab === tab 
                                     ? "bg-primary text-black font-bold shadow-lg shadow-primary/20" 
                                     : "text-gray-400 hover:text-white hover:bg-white/5"

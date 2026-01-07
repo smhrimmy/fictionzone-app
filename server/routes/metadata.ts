@@ -176,9 +176,17 @@ router.get('/:type/:id', async (req, res) => {
              } else {
                  res.status(404).json({ error: 'Novel not found' });
              }
+         } else if (id.startsWith('ao3_')) {
+             // AO3 ID
+             const details = await AO3Service.getWorkDetails(id);
+             res.json({
+                 ...details,
+                 type: 'novel',
+                 source: 'ao3'
+             });
          } else {
-            // FanMTL ID
-            const details = await FanMTLService.getNovelDetails(id);
+             // FanMTL ID
+             const details = await FanMTLService.getNovelDetails(id);
             res.json({
                 ...details,
                 type: 'novel',

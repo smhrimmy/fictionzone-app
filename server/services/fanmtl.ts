@@ -80,18 +80,62 @@ export class FanMTLService {
             const chapTitle = a.text().trim();
             const chapUrl = a.attr('href');
             if (chapUrl) {
-                const chapId = chapUrl.split('/novel/')[1].replace(realId + '/', '').replace(/\/$/, '');
+                // chapUrl example: https://fanmtl.com/novel/my-novel/chapter-1/
+                const parts = chapUrl.split('/').filter(p => p);
+                const chapId = parts[parts.length - 1]; // last part is slug
+                
                 chapters.push({
-                    id: `fanmtl_c_${realId}_${chapId}`,
+                    id: chapId, // Just use the slug, we construct url in getChapterContent
                     title: chapTitle,
-                    chapter_number: chapters.length + 1, // Reverse order usually
+                    chapter_number: chapters.length + 1,
                     published_at: $(el).find('.chapter-release-date').text().trim()
                 });
             }
         });
 
-        // If AJAX is needed, we might need a separate call, but for MVP let's hope for HTML list
-        // Often "ajax_load_chapters" is used.
+        // If no chapters found, try AJAX (Madara Theme)
+        if (chapters.length === 0) {
+            try {
+                // Find numeric ID
+                // <link rel="shortlink" href="https://fanmtl.com/?p=12345">
+                const shortlink = $('link[rel="shortlink"]').attr('href');
+                const numericId = shortlink ? shortlink.split('=')[1] : null;
+
+                if (numericId) {
+                    const ajaxRes = await axios.post(`${BASE_URL}/wp-admin/admin-ajax.php`, 
+                        new URLSearchParams({
+                            action: 'manga_get_chapters',
+                            manga: numericId
+                        }), {
+                            headers: {
+                                ...HEADERS,
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        }
+                    );
+                    
+                    const $ajax = cheerio.load(ajaxRes.data);
+                    $ajax('.wp-manga-chapter').each((_, el) => {
+                        const a = $ajax(el).find('a');
+                        const chapTitle = a.text().trim();
+                        const chapUrl = a.attr('href');
+                        if (chapUrl) {
+                             const parts = chapUrl.split('/').filter(p => p);
+                             const chapId = parts[parts.length - 1];
+                             chapters.push({
+                                id: chapId,
+                                title: chapTitle,
+                                chapter_number: 0,
+                                published_at: $ajax(el).find('.chapter-release-date').text().trim()
+                             });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('FanMTL AJAX Chapters Failed', e);
+            }
+        }
         
         return {
             id: `fanmtl_${realId}`,
@@ -111,23 +155,35 @@ export class FanMTLService {
   }
 
   static async getChapterContent(novelId: string, chapterId: string) {
-      // chapterId comes as "fanmtl_c_novelId_chapterSlug" or just "chapterSlug" if we parsed it that way
-      // let's assume we pass the full slug
+      // chapterId is now just the slug e.g. "chapter-1"
       const realNovelId = novelId.replace('fanmtl_', '');
-      const realChapterId = chapterId.replace(`fanmtl_c_${realNovelId}_`, '').replace('fanmtl_', ''); // cleanup
+      const realChapterId = chapterId.replace('fanmtl_', ''); // ensure clean
 
       try {
           const url = `${BASE_URL}/novel/${realNovelId}/${realChapterId}`;
           const response = await axios.get(url, { headers: HEADERS });
           const $ = cheerio.load(response.data);
 
-          const title = $('#chapter-heading').text().trim();
-          const content = $('.reading-content').html(); // This contains the p tags
+          const title = $('#chapter-heading').text().trim() || $('.breadcrumb li.active').text().trim();
+          
+          // Try multiple selectors for content
+          let content = $('.reading-content').html();
+          if (!content) content = $('.text-left').html();
+          if (!content) content = $('.entry-content').html();
+
+          // Clean up content (remove ads, scripts)
+          if (content) {
+              const $content = cheerio.load(content);
+              $content('script').remove();
+              $content('.adsbygoogle').remove();
+              $content('div[class*="ad"]').remove();
+              content = $content.html();
+          }
 
           return {
               id: chapterId,
               title,
-              content,
+              content: content || '<p>Content not found. Please try opening the original link.</p>',
               source: 'fanmtl'
           };
       } catch (error) {

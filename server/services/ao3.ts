@@ -54,6 +54,55 @@ export class AO3Service {
     }
   }
 
+  static async getWorkDetails(workId: string) {
+    const realId = workId.replace('ao3_', '');
+    try {
+      const response = await axios.get(`${BASE_URL}/works/${realId}`, {
+        params: { view_adult: 'true' },
+        headers: { ...HEADERS, 'Cookie': 'view_adult=true' }
+      });
+      
+      const $ = cheerio.load(response.data);
+      const title = $('h2.title').first().text().trim();
+      const author = $('h3.byline a').first().text().trim() || 'Anonymous';
+      const summary = $('.summary blockquote.userstuff').text().trim();
+      
+      const stats = $('dl.stats');
+      const chaptersText = stats.find('dd.chapters').text().trim(); // e.g. "1/?" or "10/20"
+      const totalChapters = parseInt(chaptersText.split('/')[0]) || 1;
+      const views = stats.find('dd.hits').text().trim();
+      const rating = 0; // AO3 doesn't have numeric rating, maybe use kudos?
+
+      // Generate chapter list
+      const chapters = [];
+      for (let i = 1; i <= totalChapters; i++) {
+          chapters.push({
+              id: `${i}`, // Simple index ID for AO3
+              title: `Chapter ${i}`,
+              chapter_number: i,
+              published_at: new Date().toISOString()
+          });
+      }
+
+      return {
+        id: workId,
+        title,
+        author: { username: author },
+        description: summary,
+        cover_image: '', // No cover
+        genres: [],
+        status: chaptersText.includes('?') ? 'Ongoing' : 'Completed',
+        rating,
+        views,
+        chapters,
+        source: 'ao3'
+      };
+    } catch (error) {
+      console.error('AO3 Details Error:', error);
+      throw error;
+    }
+  }
+
   static async getChapter(workId: string, chapterIndex: number = 1) {
     // workId comes as "ao3_12345"
     const realId = workId.replace('ao3_', '');
