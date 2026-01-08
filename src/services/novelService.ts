@@ -15,20 +15,22 @@ export const NovelService = {
         }
       });
 
-      if (response.data && response.data.results) {
+      if (response.data && Array.isArray(response.data.results)) {
           return {
             data: response.data.results.map((item: any) => ({
               ...item,
+              id: item.id.toString(), // Ensure ID is string
               content_type: 'novel',
               type: 'Translated',
-              author: { id: 'unknown', username: item.author || 'Unknown' },
+              author: { id: 'unknown', username: item.author?.username || item.author || 'Unknown' },
               is_completed: item.status === 'Completed',
               rating: item.rating || 0,
               total_reads: item.views || 0,
-              chapters_count: item.chapters_count || 0
+              chapters_count: item.chapters_count || 0,
+              genres: item.genres || []
             })),
-            total: response.data.pageInfo.total || 0, // Infinite scroll relies on hasMore usually
-            hasMore: response.data.pageInfo.hasNextPage
+            total: response.data.pageInfo?.total || 0, 
+            hasMore: response.data.pageInfo?.hasNextPage || false
           };
       }
       return { data: [], total: 0, hasMore: false };

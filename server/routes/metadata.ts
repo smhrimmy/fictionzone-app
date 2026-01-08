@@ -1,8 +1,6 @@
 import { Router } from 'express';
+import { sourceManager } from '../managers/SourceManager.js';
 import { AniListService } from '../services/anilist.js';
-import { MangaDexService } from '../services/mangadex.js';
-import { AO3Service } from '../services/ao3.js';
-import { FanMTLService } from '../services/fanmtl.js';
 
 const router = Router();
 
@@ -12,23 +10,26 @@ router.get('/trending', async (req, res) => {
 
   try {
     if (type === 'manga') {
-       // Fetch trending manga from MangaDex
-       const data = await MangaDexService.searchManga('', 10); // Empty query usually returns popular
-       const results = data.data.map((m: any) => ({
-         id: m.id,
-         title: m.attributes.title.en || Object.values(m.attributes.title)[0],
-         cover_image: MangaDexService.getCoverUrl(m) || '',
-         description: m.attributes.description.en || '',
-         source: 'mangadex',
-         type: 'manga'
-       }));
-       res.json(results);
+       // Fetch trending manga from MangaDex Plugin
+       const source = sourceManager.getSource('mangadex');
+       if (source) {
+           const novels = await source.search({ query: '', limit: 10 });
+           // Map to frontend expected format if needed, but Novel interface matches mostly
+           const results = novels.map(n => ({
+               ...n,
+               cover_image: n.coverUrl, // Frontend expects snake_case
+               type: 'manga',
+               source: 'mangadex'
+           }));
+           res.json(results);
+       } else {
+           res.json([]);
+       }
     } else {
        // Fetch trending novels using AniList (Fast & Reliable Metadata)
-       // We'll use the 'NOVEL' format filter in AniList
        try {
            const data = await AniListService.search({
-               query: undefined, // Trending/Popular usually implies no query
+               query: undefined, 
                type: 'MANGA',
                format: 'NOVEL',
                page: 1,
@@ -36,18 +37,17 @@ router.get('/trending', async (req, res) => {
            });
            
            const results = data.media.map((item: any) => ({
-             id: item.id.toString(), // Use AniList ID for display
+             id: item.id.toString(),
              title: item.title.english || item.title.romaji || item.title.native,
              cover_image: item.coverImage.large,
              description: item.description,
              rating: item.averageScore ? item.averageScore / 10 : 0,
-             views: item.popularity || 0, // Fix NaN issue
+             views: item.popularity || 0,
              chapters: item.chapters || 0,
              type: 'novel',
              source: 'anilist'
            }));
            
-           // Sort: Items with chapters first (if available), then by popularity
            results.sort((a: any, b: any) => {
                if (a.chapters > 0 && b.chapters === 0) return -1;
                if (a.chapters === 0 && b.chapters > 0) return 1;
@@ -57,7 +57,7 @@ router.get('/trending', async (req, res) => {
            res.json(results);
        } catch (e) {
            console.error('AniList Trending Failed', e);
-           res.json([]); // Return empty instead of 500
+           res.json([]); 
        }
     }
   } catch (error) {
@@ -71,52 +71,54 @@ router.get('/search', async (req, res) => {
   const { query, type, page, limit } = req.query;
   const pageNum = page ? parseInt(page as string) : 1;
   const perPage = limit ? parseInt(limit as string) : 20;
-  const searchQuery = query as string;
+  const searchQuery = query as string || '';
 
   try {
-    if (!searchQuery) {
+    if (!searchQuery && type !== 'manga') { // MangaDex allows empty search for latest
       return res.json({ results: [], pageInfo: {} });
     }
 
     if (type === 'manga') {
-       // Use MangaDex
-       const offset = (pageNum - 1) * perPage;
-       const data = await MangaDexService.searchManga(searchQuery, perPage, offset);
-       
-       const results = data.data.map((m: any) => ({
-         id: m.id,
-         title: m.attributes.title.en || Object.values(m.attributes.title)[0],
-         author: m.relationships.find((r: any) => r.type === 'author')?.attributes?.name || 'Unknown',
-         description: m.attributes.description.en || 'No description',
-         cover_image: MangaDexService.getCoverUrl(m) || '',
-         status: m.attributes.status,
-         type: 'manga',
-         source: 'mangadex'
-       }));
-
-       res.json({ results, pageInfo: { total: data.total, hasNextPage: (offset + perPage) < data.total } });
+       const source = sourceManager.getSource('mangadex');
+       if (source) {
+           const novels = await source.search({ query: searchQuery, page: pageNum, limit: perPage });
+           const results = novels.map(n => ({
+               ...n,
+               cover_image: n.coverUrl,
+               type: 'manga',
+               source: 'mangadex'
+           }));
+           res.json({ results, pageInfo: { hasNextPage: true } }); // Todo: fix pagination
+       } else {
+           res.json({ results: [], pageInfo: {} });
+       }
 
     } else if (type === 'novel' || type === 'fanfiction') {
-       // Try FanMTL first
-       let results = [];
-       try {
-           results = await FanMTLService.search(searchQuery, pageNum);
-       } catch (e) {
-           console.warn('FanMTL Search Failed', e);
-       }
+       // FanMTL + AO3 via Plugins
+       const fanmtl = sourceManager.getSource('fanmtl');
+       const ao3 = sourceManager.getSource('ao3');
        
-       if (results.length === 0) {
-           // Fallback to AO3
+       let novels: any[] = [];
+       try {
+           if (fanmtl) novels = await fanmtl.search({ query: searchQuery, page: pageNum });
+       } catch (e) { console.error('FanMTL search error', e); }
+
+       if (novels.length === 0 && ao3) {
            try {
-               results = await AO3Service.search(searchQuery, pageNum);
-           } catch (e) {
-               console.warn('AO3 Search Failed', e);
-           }
+               novels = await ao3.search({ query: searchQuery, page: pageNum });
+           } catch (e) { console.error('AO3 search error', e); }
        }
+
+       const results = novels.map(n => ({
+           ...n,
+           cover_image: n.coverUrl,
+           type: 'novel',
+           source: n.sourceId
+       }));
 
        res.json({ results, pageInfo: { hasNextPage: true } });
     } else {
-       // Default to AniList
+       // AniList Fallback
        const data = await AniListService.search({
          query: searchQuery,
          type: 'MANGA',
@@ -147,27 +149,19 @@ router.get('/:type/:id', async (req, res) => {
 
   try {
     if (type === 'manga') {
-        // MangaDex
-        try {
-            const data = await MangaDexService.getMangaById(id);
-            const m = data.data;
-            
+        const source = sourceManager.getSource('mangadex');
+        if (source) {
+            const novel = await source.getNovelDetails(id);
             res.json({
-                 id: m.id,
-                 title: m.attributes.title.en || Object.values(m.attributes.title)[0],
-                 author: { username: m.relationships.find((r: any) => r.type === 'author')?.attributes?.name || 'Unknown' },
-                 description: m.attributes.description.en || 'No description',
-                 cover_image: MangaDexService.getCoverUrl(m) || '',
-                 status: m.attributes.status,
-                 type: 'manga',
-                 source: 'mangadex',
-                 genres: m.attributes.tags.map((t: any) => t.attributes.name.en),
-                 rating: 0, // MangaDex doesn't give rating in simple call usually
-                 views: 0
+                ...novel,
+                cover_image: novel.coverUrl,
+                type: 'manga',
+                source: 'mangadex',
+                rating: 0,
+                views: 0
             });
-        } catch (e) {
-            console.error(e);
-            res.status(404).json({ error: 'Manga not found' });
+        } else {
+            res.status(404).json({ error: 'Manga source not found' });
         }
     } else {
         // Novel
@@ -186,7 +180,7 @@ router.get('/:type/:id', async (req, res) => {
                      views: item.popularity || 0,
                      chapters_count: item.chapters || 0,
                      genres: item.genres || [],
-                     author: { username: 'Unknown' }, // AniList requires separate query for staff usually
+                     author: { username: 'Unknown' }, 
                      type: 'novel',
                      source: 'anilist'
                  });
@@ -194,18 +188,27 @@ router.get('/:type/:id', async (req, res) => {
                  res.status(404).json({ error: 'Novel not found' });
              }
          } else if (id.startsWith('ao3_')) {
-             // AO3 ID
-             const details = await AO3Service.getWorkDetails(id);
+             const source = sourceManager.getSource('ao3');
+             const novel = await source!.getNovelDetails(id);
              res.json({
-                 ...details,
+                 ...novel,
+                 cover_image: novel.coverUrl,
                  type: 'novel',
                  source: 'ao3'
              });
          } else {
-             // FanMTL ID
-             const details = await FanMTLService.getNovelDetails(id);
-            res.json({
-                ...details,
+             // FanMTL
+             const source = sourceManager.getSource('fanmtl');
+             // Strip prefix if present for plugin call? 
+             // Plugin expects ID. FanMTLSource usually handles ID without prefix?
+             // Let's check FanMTLSource.ts. It expects raw ID in getNovelDetails logic (fetching url/novel/ID).
+             // But my old code used "fanmtl_ID".
+             // I need to strip "fanmtl_" before calling plugin if plugin expects raw ID.
+             const rawId = id.replace('fanmtl_', '');
+             const novel = await source!.getNovelDetails(rawId);
+             res.json({
+                ...novel,
+                cover_image: novel.coverUrl,
                 type: 'novel',
                 source: 'fanmtl'
             });

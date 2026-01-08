@@ -15,20 +15,21 @@ export const MangaService = {
         }
       });
 
-      if (response.data && response.data.results) {
+      if (response.data && Array.isArray(response.data.results)) {
           return {
             data: response.data.results.map((item: any) => ({
               ...item,
               content_type: 'manga',
               type: 'Translated',
-              author: { id: 'unknown', username: item.author || 'Unknown' },
+              author: { id: 'unknown', username: item.author?.username || item.author || 'Unknown' },
               is_completed: item.status === 'completed',
               rating: item.rating || 0,
               total_reads: item.views || 0,
-              chapters_count: item.chapters || 0
+              chapters_count: item.chapters || 0,
+              genres: item.genres || []
             })),
-            total: response.data.pageInfo.total || 0,
-            hasMore: response.data.pageInfo.hasNextPage
+            total: response.data.pageInfo?.total || 0,
+            hasMore: response.data.pageInfo?.hasNextPage || false
           };
       }
       return { data: [], total: 0, hasMore: false };
