@@ -19,25 +19,52 @@ router.get('/chapters/:storyId', async (req, res) => {
        const details = await FanMTLService.getNovelDetails(storyId);
        res.json(details.chapters || []);
     } else if (!isNaN(Number(storyId)) && !storyId.includes('-')) {
-       // Numeric ID = AniList (likely)
-       // 1. Get Title from AniList
-       // Note: We don't have a direct getById in AniListService yet, usually we search.
-       // Let's implement a quick fetch or assume we search by ID if needed, but search usually works.
-       // For now, let's try to search FanMTL using the ID? No.
-       // We need to resolve AniList ID to FanMTL.
-       
-       // Fallback: If we can't easily resolve, return empty or try to search if title was passed (not possible in GET param easily without query)
-       // Ideally frontend passes title in query param?
-       const { title } = req.query;
-       
-       if (title) {
-           const results = await FanMTLService.search(title as string, 1);
-           if (results.length > 0) {
-               const fanmtlId = results[0].id;
-               const details = await FanMTLService.getNovelDetails(fanmtlId);
-               res.json(details.chapters || []);
-               return;
+       // AniList ID - Resolve to FanMTL or AO3
+       // Use robust search strategy
+       try {
+           // Fetch AniList details to get all titles
+           const aniListMedia = await AniListService.getById(parseInt(storyId));
+           
+           if (aniListMedia) {
+               // Strategy: Try English title, then Romaji
+               let results: any[] = [];
+               
+               // 1. Try English Title on FanMTL
+               if (aniListMedia.title.english) {
+                   const cleanTitle = aniListMedia.title.english.replace(/\(Novel\)/i, '').trim();
+                   results = await FanMTLService.search(cleanTitle, 1);
+               }
+               
+               // 2. Try Romaji on FanMTL
+               if (results.length === 0 && aniListMedia.title.romaji) {
+                   const cleanTitle = aniListMedia.title.romaji.replace(/\(Novel\)/i, '').trim();
+                   results = await FanMTLService.search(cleanTitle, 1);
+               }
+
+               if (results.length > 0) {
+                   const fanmtlId = results[0].id;
+                   const details = await FanMTLService.getNovelDetails(fanmtlId);
+                   res.json(details.chapters || []);
+                   return;
+               }
+
+               // 3. Fallback to AO3 (English then Romaji)
+               if (aniListMedia.title.english) {
+                   results = await AO3Service.search(aniListMedia.title.english, 1);
+               }
+               if (results.length === 0 && aniListMedia.title.romaji) {
+                   results = await AO3Service.search(aniListMedia.title.romaji, 1);
+               }
+
+               if (results.length > 0) {
+                   const ao3Id = results[0].id;
+                   const details = await AO3Service.getWorkDetails(ao3Id);
+                   res.json(details.chapters || []);
+                   return;
+               }
            }
+       } catch (e) {
+           console.error('Chapter resolution failed', e);
        }
        res.json([]);
     } else {
