@@ -105,27 +105,35 @@ export class FanMTLSource extends BaseScraper {
 
   async getChapterContent(novelId: string, chapterId: string): Promise<Chapter> {
       const url = `${this.baseurl}/novel/${novelId}/${chapterId}`;
-      const $ = await this.fetchHtml(url);
+      console.log(`[FanMTL] Fetching content from ${url}`);
+      try {
+          const $ = await this.fetchHtml(url);
 
-      const title = $('#chapter-heading').text().trim() || $('.breadcrumb li.active').text().trim();
-      
-      let content = $('.reading-content').html();
-      if (!content) content = $('.text-left').html();
-      if (!content) content = $('.entry-content').html();
+          const title = $('#chapter-heading').text().trim() || $('.breadcrumb li.active').text().trim();
+          
+          let content = $('.reading-content').html();
+          if (!content) content = $('.text-left').html();
+          if (!content) content = $('.entry-content').html();
 
-      if (content) {
-          const $c = this.loadHtml(content);
-          $c('script, .adsbygoogle, div[class*="ad"]').remove();
-          content = $c.html();
+          if (content) {
+              const $c = this.loadHtml(content);
+              $c('script, .adsbygoogle, div[class*="ad"]').remove();
+              content = $c.html();
+          } else {
+              console.warn(`[FanMTL] No content found for ${url}`);
+          }
+
+          return {
+              id: chapterId,
+              novelId,
+              title,
+              chapterNumber: 0,
+              content: content || '',
+              url
+          };
+      } catch (e) {
+          console.error(`[FanMTL] Failed to fetch content for ${url}`, e);
+          throw e;
       }
-
-      return {
-          id: chapterId,
-          novelId,
-          title,
-          chapterNumber: 0,
-          content: content || '',
-          url
-      };
   }
 }

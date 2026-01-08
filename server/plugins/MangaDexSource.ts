@@ -59,25 +59,33 @@ export class MangaDexSource extends BaseScraper {
   }
 
   async getChapterContent(novelId: string, chapterId: string): Promise<Chapter> {
-    // 1. Get At-Home Server URL
-    const { data: atHome } = await this.client.get(`${this.baseurl}/at-home/server/${chapterId}`);
-    const baseUrl = atHome.baseUrl;
-    const chapterHash = atHome.chapter.hash;
-    const pageFilenames = atHome.chapter.data; // High quality
+    try {
+        console.log(`[MangaDex] Fetching content for ${chapterId}`);
+        // 1. Get At-Home Server URL
+        const { data: atHome } = await this.client.get(`${this.baseurl}/at-home/server/${chapterId}`);
+        const baseUrl = atHome.baseUrl;
+        const chapterHash = atHome.chapter.hash;
+        const pageFilenames = atHome.chapter.data; // High quality
 
-    // 2. Construct URLs
-    const images = pageFilenames.map((filename: string) => 
-        `${baseUrl}/data/${chapterHash}/${filename}`
-    );
+        console.log(`[MangaDex] Found ${pageFilenames.length} pages for ${chapterId}`);
 
-    return {
-        id: chapterId,
-        novelId,
-        title: '', // Fetched in getChapters usually
-        chapterNumber: 0,
-        content: '', // Manga has images, not text content
-        images
-    };
+        // 2. Construct URLs
+        const images = pageFilenames.map((filename: string) => 
+            `${baseUrl}/data/${chapterHash}/${filename}`
+        );
+
+        return {
+            id: chapterId,
+            novelId,
+            title: '', // Fetched in getChapters usually
+            chapterNumber: 0,
+            content: '', // Manga has images, not text content
+            images
+        };
+    } catch (e) {
+        console.error(`[MangaDex] Failed to fetch content for ${chapterId}`, e);
+        throw e;
+    }
   }
 
   private mapToNovel(m: any): Novel {
