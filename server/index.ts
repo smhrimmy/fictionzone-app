@@ -21,10 +21,12 @@ app.get('/api/health', (req, res) => {
 import metadataRoutes from './routes/metadata.js';
 import translationRoutes from './routes/translation.js';
 import contentRoutes from './routes/content.js';
+import apiV2Routes from './routes/api_v2.js';
 
 app.use('/api/metadata', metadataRoutes);
 app.use('/api/translate', translationRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/v2', apiV2Routes);
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
