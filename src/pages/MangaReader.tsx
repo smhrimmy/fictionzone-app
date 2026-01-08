@@ -27,6 +27,17 @@ export default function MangaReader() {
   // Observer for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
 
+  const fetchChapterImages = async (chapter: Chapter): Promise<Chapter> => {
+      if (chapter.images && chapter.images.length > 0) return chapter;
+      try {
+          const fullChapter = await MangaService.getChapter(storyId!, chapter.id);
+          if (fullChapter && fullChapter.images) {
+              return { ...chapter, images: fullChapter.images };
+          }
+      } catch (e) { console.error(e); }
+      return chapter;
+  };
+
   // Initial Load
   useEffect(() => {
     const init = async () => {
@@ -44,7 +55,8 @@ export default function MangaReader() {
           // Find the starting chapter
           const currentChapter = chaptersData.find(c => c.id === chapterId);
           if (currentChapter) {
-            setLoadedChapters([currentChapter]);
+            const withImages = await fetchChapterImages(currentChapter);
+            setLoadedChapters([withImages]);
           }
         } catch (error) {
           console.error("Failed to load manga data", error);
@@ -82,15 +94,13 @@ export default function MangaReader() {
     if (currentIndex !== -1 && currentIndex < availableChapters.length - 1) {
       setLoadingMore(true);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       const nextChapter = availableChapters[currentIndex + 1];
+      const withImages = await fetchChapterImages(nextChapter);
       
-      setLoadedChapters(prev => [...prev, nextChapter]);
+      setLoadedChapters(prev => [...prev, withImages]);
       setLoadingMore(false);
     }
-  }, [availableChapters, loadedChapters, loadingMore]);
+  }, [availableChapters, loadedChapters, loadingMore]); // fetchChapterImages is stable if defined outside or via ref/callback, but simple usage here is fine
 
   // Intersection Observer
   useEffect(() => {
@@ -114,10 +124,13 @@ export default function MangaReader() {
     };
   }, [loadNextChapter]);
 
-  const handleChapterJump = (id: string) => {
+  const handleChapterJump = async (id: string) => {
       const chapter = availableChapters.find(c => c.id === id);
       if (chapter) {
-          setLoadedChapters([chapter]);
+          setLoading(true); // Show loading state while fetching images
+          const withImages = await fetchChapterImages(chapter);
+          setLoadedChapters([withImages]);
+          setLoading(false);
           window.scrollTo(0, 0);
           setShowChapters(false);
           // Ideally update URL too without reload

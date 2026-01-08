@@ -34,6 +34,18 @@ export default function Reader() {
   // Observer for infinite scroll
   const observerTarget = useRef<HTMLDivElement>(null);
 
+  const fetchChapterContent = async (chapter: Chapter): Promise<Chapter> => {
+      if (chapter.content || (chapter.images && chapter.images.length > 0)) return chapter;
+      
+      try {
+          const fullChapter = await NovelService.getChapter(storyId!, chapter.id);
+          if (fullChapter) {
+              return { ...chapter, content: fullChapter.content, images: fullChapter.images };
+          }
+      } catch (e) { console.error(e); }
+      return chapter;
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (storyId && chapterId) {
@@ -58,20 +70,18 @@ export default function Reader() {
         }
 
         if (currentChapter) {
-          setLoadedChapters([currentChapter]);
+          const withContent = await fetchChapterContent(currentChapter);
+          setLoadedChapters([withContent]);
         }
         setLoading(false);
       }
     };
     loadData();
-  }, [storyId]); // Only re-run if story changes. If chapterId changes via nav, we might want to reset, but for infinite scroll we usually stick to the flow.
+  }, [storyId]); 
 
   // If chapterId changes manually (e.g. from sidebar), we should reset the view
   useEffect(() => {
      if (!loading && allChapters.length > 0 && chapterId) {
-         // Check if the requested chapter is already loaded (e.g. via scroll)
-         // If not, or if it's a jump, we might want to reset loadedChapters
-         // For simple behavior: if the user clicks a specific chapter in the menu, we reset the view to that chapter.
          let targetChapter = allChapters.find(c => c.id === chapterId);
          if (!targetChapter && chapterId) {
              targetChapter = allChapters.find(c => c.chapter_number.toString() === chapterId) ||
@@ -80,8 +90,10 @@ export default function Reader() {
          }
 
          if (targetChapter && loadedChapters[0]?.id !== targetChapter.id) {
-             setLoadedChapters([targetChapter]);
-             window.scrollTo(0, 0);
+             fetchChapterContent(targetChapter).then(withContent => {
+                 setLoadedChapters([withContent]);
+                 window.scrollTo(0, 0);
+             });
          }
      }
   }, [chapterId, allChapters]);
@@ -96,12 +108,10 @@ export default function Reader() {
     if (currentIndex !== -1 && currentIndex < allChapters.length - 1) {
       setLoadingMore(true);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       const nextChapter = allChapters[currentIndex + 1];
+      const withContent = await fetchChapterContent(nextChapter);
       
-      setLoadedChapters(prev => [...prev, nextChapter]);
+      setLoadedChapters(prev => [...prev, withContent]);
       setLoadingMore(false);
     }
   }, [allChapters, loadedChapters, loadingMore]);

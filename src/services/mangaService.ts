@@ -38,15 +38,25 @@ export const MangaService = {
     }
   },
 
-  getStoryById: async (_id: string): Promise<Story | undefined> => {
-     // For now, we don't have a direct "get by ID" endpoint that returns the full Story object format
-     // But we can simulate it by searching for it or implementing a backend route.
-     // To keep it simple, we'll return a placeholder that triggers a fetch if needed, 
-     // OR if we clicked from a list, we likely have the data in state.
-     // But if we reload on a detail page, we need this.
-     
-     // TODO: Implement /api/metadata/manga/:id
-     return undefined; 
+  getStoryById: async (id: string): Promise<Story | undefined> => {
+    try {
+        const response = await axios.get(`${API_URL}/metadata/manga/${id}`);
+        const item = response.data;
+        return {
+            ...item,
+            content_type: 'manga',
+            type: 'Translated',
+            author: { id: 'unknown', username: item.author?.username || 'Unknown' },
+            is_completed: item.status === 'Completed' || item.status === 'completed',
+            rating: item.rating || 0,
+            total_reads: item.views || 0,
+            chapters_count: item.chapters_count || 0,
+            genres: item.genres || []
+        };
+    } catch (error) {
+        console.error("Failed to fetch manga details", error);
+        return undefined;
+    }
   },
 
   getChapters: async (storyId: string): Promise<Chapter[]> => {
