@@ -13,17 +13,17 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Disable Caching globally for API
-app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  next();
+// Disable Caching ONLY for Content API (Images/Text)
+app.use('/api/content', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+    next();
 });
 
-// Routes
-app.get('/api/health', (req, res) => {
+// Mount Routes
+app.use('/api/metadata', metadataRoutes);(req, res) => {
   res.json({ status: 'ok', message: 'FictionZone API is running' });
 });
 

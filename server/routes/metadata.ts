@@ -94,20 +94,18 @@ router.get('/search', async (req, res) => {
        }
 
     } else if (type === 'novel' || type === 'fanfiction') {
-       // FanMTL + AO3 via Plugins
+       // FanMTL + AO3 via Plugins (Parallel Execution)
        const fanmtl = sourceManager.getSource('fanmtl');
        const ao3 = sourceManager.getSource('ao3');
        
-       let novels: any[] = [];
-       try {
-           if (fanmtl) novels = await fanmtl.search({ query: searchQuery, page: pageNum });
-       } catch (e) { console.error('FanMTL search error', e); }
+       const promises = [];
+       if (fanmtl) promises.push(fanmtl.search({ query: searchQuery, page: pageNum }).catch(e => { console.error('FanMTL error', e); return []; }));
+       if (ao3) promises.push(ao3.search({ query: searchQuery, page: pageNum }).catch(e => { console.error('AO3 error', e); return []; }));
 
-       if (novels.length === 0 && ao3) {
-           try {
-               novels = await ao3.search({ query: searchQuery, page: pageNum });
-           } catch (e) { console.error('AO3 search error', e); }
-       }
+       const [fanmtlResults, ao3Results] = await Promise.all(promises);
+       
+       // Merge results: FanMTL first, then AO3
+       const novels = [...(fanmtlResults || []), ...(ao3Results || [])];
 
        const results = novels.map(n => ({
            ...n,

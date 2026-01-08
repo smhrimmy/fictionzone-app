@@ -22,7 +22,16 @@ export class FanMTLSource extends BaseScraper {
     const $ = this.loadHtml(data);
     const results: Novel[] = [];
 
-    $('.c-tabs-item__content').each((_, el) => {
+    // Try multiple selectors for Madara theme search results
+    let items = $('.c-tabs-item__content');
+    if (items.length === 0) {
+        items = $('.tab-content-wrap .c-tabs-item__content');
+    }
+    if (items.length === 0) {
+        items = $('.row.c-tabs-item__content');
+    }
+
+    items.each((_, el) => {
         const titleEl = $(el).find('.post-title h3 a');
         const title = titleEl.text().trim();
         const url = titleEl.attr('href');
@@ -79,9 +88,46 @@ export class FanMTLSource extends BaseScraper {
         }
     });
 
-    // Fallback AJAX check (Simplified for plugin demo)
+    // Fallback AJAX check (Madara Theme)
     if (chapters.length === 0) {
-        // In a real plugin, we would implement the AJAX call here as done in the service
+        try {
+            const shortlink = $('link[rel="shortlink"]').attr('href');
+            const numericId = shortlink ? shortlink.split('=')[1] : null;
+
+            if (numericId) {
+                const { data: ajaxData } = await this.client.post(`${this.baseurl}/wp-admin/admin-ajax.php`, 
+                    new URLSearchParams({
+                        action: 'manga_get_chapters',
+                        manga: numericId
+                    }), {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    }
+                );
+                
+                const $ajax = this.loadHtml(ajaxData);
+                $ajax('.wp-manga-chapter').each((_, el) => {
+                    const a = $ajax(el).find('a');
+                    const chapUrl = a.attr('href');
+                    if (chapUrl) {
+                         const parts = chapUrl.split('/').filter(p => p);
+                         const chapId = parts[parts.length - 1];
+                         chapters.push({
+                            id: chapId,
+                            novelId: id,
+                            title: a.text().trim(),
+                            chapterNumber: 0,
+                            releaseDate: $ajax(el).find('.chapter-release-date').text().trim(),
+                            url: chapUrl
+                         });
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('FanMTL AJAX Chapters Failed', e);
+        }
     }
 
     return {
